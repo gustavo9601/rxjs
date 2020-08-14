@@ -1,4 +1,4 @@
-import {Observable, Observer, Subject, of} from 'rxjs'
+import {Observable, Observer, Subject, of, fromEvent} from 'rxjs'
 
 // new Observable<tipo de dato>( suscriber que emitira informacion )
 const observable1$ = new Observable<string>(subs => {
@@ -31,7 +31,8 @@ observable1$.subscribe(
 )
 
 
-//Otra forma de ejecutar una subscripcion es pasarle un oberver objeto que tenga definido que hacer en las funciones next, error y complete
+//Otra forma de ejecutar una subscripcion es pasarle un
+// oberver (Interfaz) objeto que tenga definido que hacer en las funciones next, error y complete
 const observer1: Observer<any> = {
     next: valor_next => console.log("valor_next desde observer", valor_next),
     error: valor_error => console.log("valor_error desde observer", valor_error),
@@ -107,7 +108,7 @@ const subscripcionIntervaloRandom2 = intervalo3$.subscribe(numero_random => cons
 setTimeout(() => {
     subscripcionIntervaloRandom1.unsubscribe()
     subscripcionIntervaloRandom2.unsubscribe()
-},5000)
+}, 5000)
 
 
 //Subject => permite que cualquier suscripcion del observable emita la misma respuesta a todas las emisiones
@@ -130,9 +131,7 @@ setTimeout(() => {
 
     subscripcionIntervaloRandom3.unsubscribe()
     subscripcionIntervaloRandom4.unsubscribe()
-},5000)
-
-
+}, 5000)
 
 
 /*=======================================================================*/
@@ -147,14 +146,41 @@ setTimeout(() => {
 // con el operador ...[1,2,3,4,5] para que genere elementos pro separado
 // Recorre todos los valores secuencialemtne emitiendolos y al finalizar la lista, se ejecuta el complete
 
-const observableof1$ = of(1,2,3,4,5);
+const observableof1$ = of(1, 2, 3, 4, 5);
 observableof1$.subscribe(
-    (next) => {console.log("next observableof1$", next)},
-    (error) => {console.log("error observableof1$", error)},
-    () => {console.log("Termino la secuencia observableof1$")}
+    (next) => {
+        console.log("next observableof1$", next)
+    },
+    (error) => {
+        console.log("error observableof1$", error)
+    },
+    () => {
+        console.log("Termino la secuencia observableof1$")
+    }
 )
 
-const observableof2$ = of<any>(1,[1,2], {'a':"A", "b":"B"}, true);
+const observableof2$ = of<any>(1, [1, 2], {'a': "A", "b": "B"}, true);
 observableof2$.subscribe((valor_next) => {
     console.log("observableof2$ valor_next", valor_next)
 })
+
+
+// fromEvent(document, 'scroll')  Crea un observable a partir de un evento en un target o elemento
+
+const observablefromevent1$ = fromEvent(document, 'click');  // Evento click
+// Es bueno colocarle el tipo de evento, para poder acceder a las propiedades del evento
+const observablefromevent2$ = fromEvent<KeyboardEvent>(document, 'keyup');   // Evento cuando se suelta una tecla
+
+const observerFromEvent: Observer<any> = {
+    next: (valorFromEvent) => console.log("valorFromEvent", valorFromEvent),
+    error: () => {
+    },
+    complete: () => {
+    },
+}
+observablefromevent1$.subscribe(observerFromEvent);
+observablefromevent2$.subscribe((respuestaKeyup) => {
+    console.log("Evento keyup", respuestaKeyup.key)
+});
+
+
