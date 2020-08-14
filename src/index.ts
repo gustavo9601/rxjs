@@ -1,4 +1,4 @@
-import {Observable, Observer, Subject} from 'rxjs'
+import {Observable, Observer, Subject, of} from 'rxjs'
 
 // new Observable<tipo de dato>( suscriber que emitira informacion )
 const observable1$ = new Observable<string>(subs => {
@@ -90,8 +90,6 @@ setTimeout(() => {
 /*=======================================================================*/
 /*=======================================================================*/
 
-
-
 const intervalo3$ = new Observable<number>(subs => {
 
     const intervalRandom = setInterval(() => {
@@ -126,13 +124,37 @@ const subscripcionIntervaloRandom4 = subject1$.subscribe(numero_random => consol
 
 
 setTimeout(() => {
-
     //Permite emitir adicionalmente al flujo la emision de un nuevo valor
     subject1$.next(10000)
     subject1$.complete()  // tambien permite la ejecucion del complete, pero para finalizar la subscripcion se debe usar unsubscribe
 
     subscripcionIntervaloRandom3.unsubscribe()
     subscripcionIntervaloRandom4.unsubscribe()
-
-
 },5000)
+
+
+
+
+/*=======================================================================*/
+/*=======================================================================*/
+/*=======================================================================*/
+/*=======================================================================*/
+
+//Funciones propias de Rxjs que simplifica la creacion de observables
+
+
+// of()  Crea un observable en vase a un listado de elementos separados por comas != a un [], si se requiere se puede mandar
+// con el operador ...[1,2,3,4,5] para que genere elementos pro separado
+// Recorre todos los valores secuencialemtne emitiendolos y al finalizar la lista, se ejecuta el complete
+
+const observableof1$ = of(1,2,3,4,5);
+observableof1$.subscribe(
+    (next) => {console.log("next observableof1$", next)},
+    (error) => {console.log("error observableof1$", error)},
+    () => {console.log("Termino la secuencia observableof1$")}
+)
+
+const observableof2$ = of<any>(1,[1,2], {'a':"A", "b":"B"}, true);
+observableof2$.subscribe((valor_next) => {
+    console.log("observableof2$ valor_next", valor_next)
+})
