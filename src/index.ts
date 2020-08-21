@@ -1,22 +1,36 @@
-import {Observable, Observer, Subject, of, fromEvent, range, asyncScheduler, interval, timer, from} from 'rxjs'
+import {
+    Observable,
+    Observer,
+    Subject,
+    of,
+    fromEvent,
+    range,
+    asyncScheduler,
+    interval,
+    timer,
+    from,
+    concat,
+    merge, forkJoin, zip
+} from 'rxjs'
 import {
     catchError,
     debounceTime,
-    distinct, distinctUntilChanged,
+    distinct, distinctUntilChanged, endWith,
     filter,
     first,
     map,
-    mapTo,
+    mapTo, mergeAll,
     pluck,
     reduce,
     scan,
-    skip,
+    skip, startWith, switchMap,
     take,
     takeUntil,
     takeWhile,
     tap
 } from "rxjs/operators";
 import {ajax, AjaxError} from "rxjs/ajax";
+import {ajaxGetJSON} from "rxjs/internal-compatibility";
 
 
 function observablesNormales() {
@@ -913,50 +927,307 @@ fetchPromesa
 // ajax rxjs permite realizar peticiones http de una forma mas eficiente, devuelve mas informacion de la peticion
 // catchError()  // sirve para atrapara cualquier error que suja en el observable
 
-// ajax.get(url, {headers})
-ajax(url).pipe(
-    //map(respuesta => respuesta.response)
-    pluck('response'),
-    catchError((error: AjaxError) => {
-        console.log("Error en el catchError", error)
-        //return error
-        //Podemos retornar un nuevo observable
-        return of([]);
-    })
-)
-    .subscribe(
-        (respuesta) => {
-            console.log("respuesta ajax rxjs", respuesta)
-        }
+function observableAjax() {
+    // ajax.get(url, {headers})
+    ajax(url).pipe(
+        //map(respuesta => respuesta.response)
+        pluck('response'),
+        catchError((error: AjaxError) => {
+            console.log("Error en el catchError", error)
+            //return error
+            //Podemos retornar un nuevo observable
+            return of([]);
+        })
     )
+        .subscribe(
+            (respuesta) => {
+                console.log("respuesta ajax rxjs", respuesta)
+            }
+        )
 
 
 // getJson(url, {headers})  realiza peticiones ajax y retorna un observable
 
-const url2 = 'https://httpbin.org/delay/1';
+    const url2 = 'https://httpbin.org/delay/1';
 
-const observableGetJson$ = ajax.getJSON(url2, {
-    'Content-Type': 'cabcera test',
-    'token_test': '123'
-});
+    const observableGetJson$ = ajax.getJSON(url2, {
+        'Content-Type': 'cabcera test',
+        'token_test': '123'
+    });
 
-observableGetJson$.subscribe(data => console.log('data getjson: ', data))
+    observableGetJson$.subscribe(data => console.log('data getjson: ', data))
 
 
 //post con rxjs
 // .post .put
 // .delete(url, {cabeceras})
-ajax.post(url2, {'valor1': 'valor'}, {'cabecera1': 'cabezera'}).subscribe(respuesta => console.log("respuesta post rxjs", respuesta))
+    ajax.post(url2, {'valor1': 'valor'}, {'cabecera1': 'cabezera'}).subscribe(respuesta => console.log("respuesta post rxjs", respuesta))
 
 //Otra forma de armar la peticion
 
-ajax({
-    url: 'url',
-    method: 'POST', // GET | POST | PUT | DELETE
-    headers: {
-        'tokennn': 'token:valor'
-    },
-    body: {
-        'campo1': 'valor1'
-    }
-}).subscribe(console.log)
+    ajax({
+        url: 'url',
+        method: 'POST', // GET | POST | PUT | DELETE
+        headers: {
+            'tokennn': 'token:valor'
+        },
+        body: {
+            'campo1': 'valor1'
+        }
+    }).subscribe(console.log)
+
+}
+
+
+//observableAjax();
+
+
+/*=======================================================================*/
+/*=======================================================================*/
+/*=======================================================================*/
+/*=======================================================================*/
+
+/*///////////////////////////////////////////////////////////////////////*/
+// Tranformacion de observables
+
+
+// Creacion de elementos en el dom
+
+function elementosEnElDom() {
+    // Referencias
+    const body = document.querySelector('body');
+    const textInput = document.createElement('input');
+    const orderList = document.createElement('ol');
+    body.append(textInput, orderList);
+}
+
+elementosEnElDom();
+
+function ejemploObservableDentroDeOtroObservable() {
+
+    const inputHtml = document.querySelector('input');
+    const input$ = fromEvent(inputHtml, 'keyup');
+
+    input$.pipe(
+        debounceTime(600),   //delay de 600 segundos para ejecutar el siguiente operador
+        map(
+            (evento) => {
+                const texto = evento.target['value'];  // capturando el texto tipeado en el input
+                //Retornamos un observable
+                return ajaxGetJSON('https://api.github.com/users/' + texto);
+            }
+        )
+    ).subscribe(
+        (respuestaObservable) => {
+            respuestaObservable.pipe(
+                tap((valor) => console.log("valor", valor)),
+                pluck('url')   // onteniendo de la respuesta, unicamente el atributo url
+            ).subscribe(respuestaSegundoObservable => console.log("respuestaSegundoObservable", respuestaSegundoObservable))
+        }
+    )
+
+
+}
+
+//ejemploObservableDentroDeOtroObservable();
+
+
+//////////////////////////////////////////////////////
+// mergeAll(); permite trabajar con observables que retornan observables
+// Permite unir en una linea de tiempo emisiones de diferentes obsevables que se activen en el pipe()
+
+function observableOperatorMergeAll() {
+    const inputHtml = document.querySelector('input');
+    const input$ = fromEvent<KeyboardEvent>(inputHtml, 'keyup');
+
+    input$.pipe(
+        debounceTime<KeyboardEvent>(500),  // delaey al evento keyup obsevable de 500
+        pluck<KeyboardEvent, string>('target', 'value'),  // accedemos a la propiedad target.value
+        map(texto => ajax.getJSON(
+            `https://api.github.com/search/users?q=${texto}`   // retornamos otro observable
+        )),
+        mergeAll(),  // uniendo los observables
+        pluck('items')  // accediendo a la propiedad .items del value del api
+    ).subscribe(console.log);
+
+}
+
+
+//observableOperatorMergeAll();
+
+
+//////////////////////////////////////////////////////
+// startWith() permite emitir al principio cual quier valor a la suscripcion
+// endWith() permite emitir al final antes del complete cualquier valor
+// Pueden ser utilies para usar un loading en alguna peticion en el start se muestra y en el end se oculta
+
+
+function observablesOperatorstartWithEndWith() {
+    const numeros$ = of(1, 2, 3).pipe(
+        startWith('a', 'b', 'c'),  // emitira al principio de la suscripcion
+        endWith('x', 'y', 'z'),  // emitira al final de la suscipcion
+    );
+    numeros$.subscribe(console.log);
+
+}
+
+//observablesOperatorstartWithEndWith();
+
+
+///////////////////////////////////////////////////
+///////////////////////////////////////////////////
+///////////////////////////////////////////////////
+///////////////////////////////////////////////////
+///////////////////////////////////////////////////
+// Funciones con observables
+
+// concat(observable1, observable2, observable3)
+// esta funcion permite usar un sistema de colas de iziquerida a derecha, de obserrvables hasata que no finalice la primera no inicia la segunda ...
+
+function funcionConcatObservables() {
+    const interval$ = interval(1000);
+
+    concat(
+        interval$.pipe(take(3)),
+        interval$.pipe(take(2)),
+        of(1)
+    ).subscribe(console.log)
+
+}
+
+//funcionConcatObservables();
+
+
+////////////////////////////////////////////////
+//// merge(observable1, observable2, observable3)
+// permite unir todos los observables pasados por parametor en una misma linea de tiempo
+// por lo cual cada observables puede e emitir o no sus valores en la linea de tiempo
+
+function functionMergeObservables() {
+    const keyup$ = fromEvent(document, 'keyup');
+    const click$ = fromEvent(document, 'click');
+
+    merge(
+        keyup$.pipe(pluck('type')),  // le pasamos el observable de formEvent, y solo emitimos el atributo type
+        click$.pipe(pluck('type'))
+    ).subscribe(console.log);
+}
+
+//functionMergeObservables();
+
+
+///////////////////////////////////////////////////
+// forkJoin(observable1, observable2, observable3)
+// permite esperar hasta que todos los observables se ejecutaen y se completen, una ves finalizado emitira un arreglo con cada respuesta
+// util cuando se requiere mostrar una emision al tiempo que las demas
+
+function functionObservableForKjoin() {
+
+    const GITHUB_API_URL = 'https://api.github.com/users';
+    const GITHUB_USER = 'klerith';
+
+    // le podemos pasar un objeto, que cada llave retornara el valor para poder acceder a la respuesta emision
+    // y cada valor sera el retorno de la emision
+    forkJoin({
+        usuario: ajax.getJSON(
+            `${GITHUB_API_URL}/${GITHUB_USER}`
+        ),
+        repos: ajax.getJSON(
+            `${GITHUB_API_URL}/${GITHUB_USER}/repo123123s`
+        ).pipe(
+            catchError(err => of({'error': err}))  // controlamos el error y retornamos un obsrevable cuando corra el error
+        ),
+        gists: ajax.getJSON(
+            `${GITHUB_API_URL}/${GITHUB_USER}/gists`
+        )
+    }).pipe(
+        catchError(err => of(err))
+    ).subscribe(console.log);
+
+}
+
+
+//functionObservableForKjoin();
+
+/*============================================================*/
+/*============================================================*/
+/*============================================================*/
+/*============================================================*/
+/*============================================================*/
+/*============================================================*/
+
+/// Ejercicios
+
+
+function capitalizarEjercicio() {
+    const nombres: string[] = ['batman', 'joker', 'doble cara', 'pingüino', 'hiedra venenosa'];
+
+    const capitalizar = (nombre) => nombre.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+
+    console.log("*Nombres capitalizados*")
+    from<string[]>(nombres).pipe(
+        map<string, string>(nombre => capitalizar(nombre))
+    ).subscribe(console.log)
+
+}
+
+capitalizarEjercicio();
+
+
+function reduceSumarSoloNumeros() {
+
+    const datos = [1, 2, 'foo', 3, 5, 6, 'bar', 7, 8];
+    console.log("*Sumatoria Solo numeros*")
+    from(datos).pipe(
+        filter<any>(valor => !isNaN(valor)),
+        reduce((valor_acumulado, valor_actual) => valor_acumulado + valor_actual)
+    ).subscribe(console.log) // La salida debe de ser 32
+
+}
+
+reduceSumarSoloNumeros();
+
+
+function randomDosObservablesEmitiendoLoMismo() {
+
+    const reloj$ = interval(1000).pipe(
+        take(5),
+        map(val => Math.round(Math.random() * 100))
+    );
+
+
+    const subjectReloj$ = new Subject();
+
+    reloj$.subscribe(subjectReloj$);
+
+
+    console.log("*Valores random, con una misma subscripcion para 2 obserbables*")
+    subjectReloj$.subscribe(val => console.log('observable 1 random', val));
+    subjectReloj$.subscribe(val => console.log('observable 2 random', val));
+}
+
+randomDosObservablesEmitiendoLoMismo();
+
+// zip(observable1, observable2)
+// Usando zip, para combinar en un arreglo la respuesta o emision de uno o mas observables
+
+function zipDestructuracionArreglos() {
+
+    const SW_API = 'https://swapi.dev/api';
+    const getRequest = (url: string) => ajax.getJSON<any>(url);
+
+
+    // Realizar el llamado al URL para obtener a Luke Skywalker
+    getRequest(`${SW_API}/people/1`).pipe(
+        tap((valor) => console.log("Valor antes del switchMap", valor)),
+        //switchMap() recibe un observable y lo aplana suscribiendose y emitiendo el resultado
+        // switchMap( respueta => zip( of(creamos un observable con la respuesta), pasamos la respuesta como parametro a otro observvable ))
+        switchMap(respuesta => zip(of(respuesta), getRequest(respuesta.url))),
+        tap((valor) => console.log("Valor despues del switchMap", valor)),
+        // map(desctrucracion de un arreglo a 2 variables, retornamos un objeto con las 2 variables en llave/valor)
+        map(([personaje, especie]) => ({personaje, especie}))
+    ).subscribe((respuesta) => console.log("Respuesta despues de switchMap y map", respuesta));           // ==
+
+}
+
+zipDestructuracionArreglos();
